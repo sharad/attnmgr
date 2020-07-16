@@ -68,7 +68,6 @@ class Daemon:
                 else:
                     self.log.warning('no more data from %s' % client_address)
                     break
-
         finally:
             # Clean up the connection
             connection.close()
@@ -93,8 +92,6 @@ class RemoteSshHandler(Handler):
 class XwinSessionHandler(Handler):
     def __init__(self):
         print()
-
-
 
 def main():
     daemon = Daemon()
