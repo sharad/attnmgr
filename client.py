@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
+# send table key value ...pairs
+
 
 import socket
 import sys
 import logging
+import pickle
 
 class Client:
+    sockbuffLen = 1024
+
     def __init__(self, server_address = './uds_socket'):
         logging.basicConfig(format='%(message)s')
-        self.log = logging.getLogger(__name__)
+        self.log            = logging.getLogger(__name__)
         self.server_address = server_address
         self.connect()
 
@@ -23,19 +28,20 @@ class Client:
             self.log.warning(msg)
             sys.exit(1)
 
-    def send(self):
+    def send(self, msg):
         try:
             # Send data
-            message = 'This is the message.  It will be repeated.'
-            byt     = message.encode()
-            self.log.warning('sending "%s"' % message)
+            # msg = 'This is the msg.  It will be repeated.'
+            byt = msg.encode()
+
+            self.log.warning('sending "%s"' % msg)
             self.sock.sendall(byt)
 
             amount_received = 0
-            amount_expected = len(message)
+            amount_expected = len(msg)
 
             while amount_received < amount_expected:
-                data = self.sock.recv(16)
+                data = self.sock.recv( Client.sockbuffLen )
                 amount_received += len(data)
                 self.log.warning('received "%s"' % data)
 
@@ -45,10 +51,24 @@ class Client:
 
 
 
+def listToDict(lst):
+    op = {lst[i]: lst[i + 1] for i in range(0, len(lst), 2)}
+    return op
+
 
 def main():
-    client = Client()
-    client.send()
+    client  = Client()
+    table   = sys.argv[1]
+    keyvals = listToDict( sys.argv[2:] )
+
+    # tableKv = dict(table = keyvals)
+
+    print("{}")
+
+    print("{%s: }" % table )
+
+    client.send(( "test" ))
+
 
 
 

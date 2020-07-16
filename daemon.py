@@ -25,6 +25,8 @@ class Database:
 
 
 class Daemon:
+    sockbuffLen = 1024
+
     def __init__(self, server_address = './uds_socket'):
         logging.basicConfig(format='%(message)s')
         self.log = logging.getLogger(__name__)
@@ -56,7 +58,7 @@ class Daemon:
 
             # Receive the data in small chunks and retransmit it
             while True:
-                data    = connection.recv( 16 )
+                data    = connection.recv( Daemon.sockbuffLen )
                 message = data.decode()
                 # self.log.warning('received "%s"' % message)
                 if data:
@@ -79,7 +81,17 @@ class Daemon:
             self.process(connection, client_address)
 
 
+class Handler:
+    def __init__(self):
+        print()
 
+class RemoteSshHandler(Handler):
+    def __init__(self):
+        print()
+
+class XwinSessionHandler(Handler):
+    def __init__(self):
+        print()
 
 
 
