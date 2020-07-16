@@ -7,6 +7,7 @@ import os
 import tinydb # https://tinydb.readthedocs.io/en/stable/getting-started.html#basic-usage
 # from tinydb import TinyDB, Query
 import logging
+import json
 
 
 
@@ -52,16 +53,18 @@ class Daemon:
         # Listen for incoming connections
         self.sock.listen(1)
 
+    def processJson(self, json):
+        json.get(1)
 
-    def process(self, connection, client_address):
+    def processConnection(self, connection, client_address):
         try:
             self.log.warning('connection from %s' % client_address)
-
+            msg = ""
             # Receive the data in small chunks and retransmit it
             while True:
                 data    = connection.recv( Daemon.sockbuffLen )
-                message = data.decode()
-                # self.log.warning('received "%s"' % message)
+                msg += data.decode()
+                # self.log.warning('received "%s"' % msg)
                 if data:
                     self.log.warning('sending data back to the client')
                     connection.sendall(data)
@@ -71,6 +74,8 @@ class Daemon:
         finally:
             # Clean up the connection
             connection.close()
+            tableKv = json.load(msg)
+            self.processJson(tableKv)
 
 
     def loop(self):
@@ -78,7 +83,7 @@ class Daemon:
             # Wait for a connection
             self.log.warning('waiting for a connection')
             connection, client_address = self.sock.accept()
-            self.process(connection, client_address)
+            self.processConnection(connection, client_address)
 
 
 class Handler:
