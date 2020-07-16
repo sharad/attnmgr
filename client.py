@@ -5,7 +5,7 @@
 import socket
 import sys
 import logging
-import pickle
+import json
 
 class Client:
     sockbuffLen = 1024
@@ -60,14 +60,12 @@ def main():
     client  = Client()
     table   = sys.argv[1]
     keyvals = listToDict( sys.argv[2:] )
+    tableKv = dict()
 
-    # tableKv = dict(table = keyvals)
+    tableKv[ table ] = keyvals
+    jsonstr          = json.dumps( tableKv )
 
-    print("{}")
-
-    print("{%s: }" % table )
-
-    client.send(( "test" ))
+    client.send( json.dumps( tableKv ) )
 
 
 

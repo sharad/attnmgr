@@ -13,7 +13,8 @@ import logging
 
 class Database:
     def __init__(self, dbfile = 'db.json'):
-        self.db = tinydb.TinyDB(dbfile)
+        self.tables = dict();
+        self.db     = tinydb.TinyDB(dbfile)
 
     def add(self, table, json):
         self.db.insert({'type': 'apple', 'count': 7})
