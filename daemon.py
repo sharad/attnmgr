@@ -117,7 +117,7 @@ class XwinSessionHandler(Handler):
 
     def run(self, json):
         self.log.warning('running client with json = %s' % json)
-        self.ask()
+        self.ask(json)
 
     def ask(self, json):
         # https://github.com/bcbnz/python-rofi
