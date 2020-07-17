@@ -119,11 +119,15 @@ class XwinSessionHandler(Handler):
         self.log.warning('running client with json = %s' % json)
         self.ask()
 
-    def ask(self):
+    def ask(self, json):
         # https://github.com/bcbnz/python-rofi
         r = rofi.Rofi()
-        options = ['Red', 'Green', 'Blue', 'White', 'Silver', 'Black', 'Other']
-        index, key = r.select('What colour car do you drive?', options)
+        # win = json["winid"]
+        prompt = "%s need your attention" % "window"
+        options = ["Select it.",
+                   "Remind after 10 mins",
+                   "Ignore"]
+        index, key = r.select(prompt, options)
 
 def main():
     daemon = Daemon()
