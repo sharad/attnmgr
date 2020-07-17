@@ -10,10 +10,14 @@ import logging
 import json
 
 
+class DaemonBase(object):
+    def __init__(self):
+        logging.basicConfig(format='%(message)s')
+        self.log = logging.getLogger(__name__)
 
-
-class Database:
+class Database(DaemonBase):
     def __init__(self, dbfile = 'db.json'):
+        DaemonBase.__init__(self)
         self.tables = dict();
         self.db     = tinydb.TinyDB(dbfile)
 
@@ -26,12 +30,12 @@ class Database:
         self.db.update({'count': 10}, Fruit.type == 'apple')
 
 
-class Daemon:
+class Daemon(DaemonBase):
     sockbuffLen = 1024
 
     def __init__(self, server_address = './uds_socket'):
-        logging.basicConfig(format='%(message)s')
-        self.log = logging.getLogger(__name__)
+        DaemonBase.__init__(self)
+        self.handlers = dict()
         self.server_address = server_address
         self.mksocket()
 
@@ -84,6 +88,7 @@ class Daemon:
         finally:
             # Clean up the connection
             connection.close()
+            self.log.warning('received "%s"' % msg)
             tableKv = json.load(msg)
             self.processJson(tableKv)
 
@@ -95,7 +100,7 @@ class Daemon:
             self.processConnection(connection, client_address)
 
 
-class Handler:
+class Handler(DaemonBase):
     def __init__(self):
         print()
 
@@ -107,8 +112,12 @@ class XwinSessionHandler(Handler):
     def __init__(self):
         print()
 
+    def run(self, json):
+        self.log.warning('running client with json = %s' % json)
+
 def main():
     daemon = Daemon()
+    daemon.registerHandler("XwinSessionHandler", XwinSessionHandler)
     daemon.loop()
 
 
