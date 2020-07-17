@@ -53,8 +53,18 @@ class Daemon:
         # Listen for incoming connections
         self.sock.listen(1)
 
+    def registerHandler(self, hdlrname, handler):
+        self.handlers[hdlrname] = handler
+
+    def processHandler(self, hdlrname, json):
+        if self.handlers[hdlrname]:
+            handler = self.handlers[hdlrname](json)
+            handler.run()
+
     def processJson(self, json):
-        json.get(1)
+        if 1 == len(json):
+            table = list(json.keys())[0]
+            self.processHandler(self.tableHandler[table], json[table])
 
     def processConnection(self, connection, client_address):
         try:
@@ -76,7 +86,6 @@ class Daemon:
             connection.close()
             tableKv = json.load(msg)
             self.processJson(tableKv)
-
 
     def loop(self):
         while True:
