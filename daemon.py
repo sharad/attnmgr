@@ -60,15 +60,17 @@ class Daemon(DaemonBase):
     def registerHandler(self, hdlrname, handler):
         self.handlers[hdlrname] = handler
 
-    def processHandler(self, hdlrname, json):
-        if self.handlers[hdlrname]:
-            handler = self.handlers[hdlrname](json)
-            handler.run()
+    def processHandler(self, hdlrname, js):
+        if hdlrname in self.handlers:
+            handler = self.handlers[hdlrname]
+            handler.run(js)
+        else:
+            self.log.warning("No handler present for %s" % hdlrname)
 
-    def processJson(self, json):
-        if 1 == len(json):
-            table = list(json.keys())[0]
-            self.processHandler(self.tableHandler[table], json[table])
+    def processJson(self, js):
+        if 1 == len(js):
+            table = list(js.keys())[0]
+            self.processHandler(table, js[table])
 
     def processConnection(self, connection, client_address):
         try:
@@ -78,7 +80,6 @@ class Daemon(DaemonBase):
             while True:
                 data    = connection.recv( Daemon.sockbuffLen )
                 msg += data.decode()
-                # self.log.warning('received "%s"' % msg)
                 if data:
                     self.log.warning('sending data back to the client')
                     connection.sendall(data)
@@ -88,8 +89,8 @@ class Daemon(DaemonBase):
         finally:
             # Clean up the connection
             connection.close()
-            self.log.warning('received "%s"' % msg)
-            tableKv = json.load(msg)
+            self.log.warning('received msg = %s' % msg)
+            tableKv = json.loads(msg)
             self.processJson(tableKv)
 
     def loop(self):
@@ -102,22 +103,23 @@ class Daemon(DaemonBase):
 
 class Handler(DaemonBase):
     def __init__(self):
+        DaemonBase.__init__(self)
         print()
 
 class RemoteSshHandler(Handler):
     def __init__(self):
-        print()
+        Handler.__init__(self)
 
 class XwinSessionHandler(Handler):
     def __init__(self):
-        print()
+        Handler.__init__(self)
 
     def run(self, json):
         self.log.warning('running client with json = %s' % json)
 
 def main():
     daemon = Daemon()
-    daemon.registerHandler("XwinSessionHandler", XwinSessionHandler)
+    daemon.registerHandler("xwin", XwinSessionHandler())
     daemon.loop()
 
 
