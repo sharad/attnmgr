@@ -8,6 +8,7 @@ import tinydb # https://tinydb.readthedocs.io/en/stable/getting-started.html#bas
 # from tinydb import TinyDB, Query
 import logging
 import json
+import rofi
 
 
 class DaemonBase(object):
@@ -116,6 +117,13 @@ class XwinSessionHandler(Handler):
 
     def run(self, json):
         self.log.warning('running client with json = %s' % json)
+        self.ask()
+
+    def ask(self):
+        # https://github.com/bcbnz/python-rofi
+        r = rofi.Rofi()
+        options = ['Red', 'Green', 'Blue', 'White', 'Silver', 'Black', 'Other']
+        index, key = r.select('What colour car do you drive?', options)
 
 def main():
     daemon = Daemon()
