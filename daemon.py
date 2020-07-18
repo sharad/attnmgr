@@ -9,6 +9,9 @@ import tinydb # https://tinydb.readthedocs.io/en/stable/getting-started.html#bas
 import logging
 import json
 import rofi
+import subprocess
+import re
+from enum import Enum, unique, auto
 
 
 class DaemonBase(object):
@@ -29,6 +32,34 @@ class Database(DaemonBase):
         Fruit = tinydb.Query()
         self.db.search(Fruit.type == 'peach')
         self.db.update({'count': 10}, Fruit.type == 'apple')
+
+class Utils(DaemonBase):
+    def __init__(self):
+        DaemonBase.__init__(self)
+
+    def getActiveWindowId():
+        root = subprocess.Popen(['xprop', '-root', '_NET_ACTIVE_WINDOW'], stdout=subprocess.PIPE)
+        stdout, stderr = root.communicate()
+        m = re.search(b'^_NET_ACTIVE_WINDOW.* ([\w]+)$', stdout)
+        if m != None:
+            window_id = m.group(1)
+            return window_id.decode()
+        else:
+            return None
+
+    def focusWindId(winId):
+        root = subprocess.Popen(['wmctrl', '-i', '-a', str(winId)], stdout=subprocess.PIPE)
+        stdout, stderr = root.communicate()
+        return True
+
+    def getWinTitle(winId):
+        window = subprocess.Popen(['xprop', '-id', str(winId), 'WM_NAME'], stdout=subprocess.PIPE)
+        stdout, stderr = window.communicate()
+        match = re.match(b"WM_NAME\(\w+\) = (?P<name>.+)$", stdout)
+        if match != None:
+            return match.group("name").decode()
+
+
 
 
 class Daemon(DaemonBase):
@@ -107,31 +138,50 @@ class Handler(DaemonBase):
         DaemonBase.__init__(self)
         print()
 
-class RemoteSshHandler(Handler):
+class RemoteSshScreenHandler(Handler):
     def __init__(self):
         Handler.__init__(self)
 
 class XwinSessionHandler(Handler):
+    Action = Enum('Action', ['Ignore', 'Select', 'Remind'], start=0)
+
     def __init__(self):
         Handler.__init__(self)
 
+    def giveFocus(self):
+        getActiveWindowId()
+
     def run(self, json):
         self.log.warning('running client with json = %s' % json)
-        self.ask(json)
+        winid        = int( json["winid"], 10 )
+        activewinid  = int( Utils.getActiveWindowId(), 16 )
+        wtitle       = Utils.getWinTitle(winid)
+        if winid == activewinid:
+            self.log.warning("window %s[%d] already have focus" % (wtitle, winid))
+        else:
+            self.log.warning("window %s[%d] not have focus" % (wtitle, winid))
+            if XwinSessionHandler.Action.Select.value == self.ask(json):
+                Utils.focusWindId(winid)
+            # self.ask(json)
+        return True
 
     def ask(self, json):
         # https://github.com/bcbnz/python-rofi
         r = rofi.Rofi()
-        # win = json["winid"]
         prompt = "%s need your attention" % "window"
-        options = ["Select it.",
-                   "Remind after 10 mins",
-                   "Ignore"]
+        actions = dict()
+        actions[XwinSessionHandler.Action.Ignore] = "Ignore"
+        actions[XwinSessionHandler.Action.Select] = "Select it."
+        actions[XwinSessionHandler.Action.Remind] = "Remind after 10 mins"
+        options = actions.values()
         index, key = r.select(prompt, options)
+        self.log.warning("index %d, key %d" % (index, key))
+        return index
 
 def main():
     daemon = Daemon()
     daemon.registerHandler("xwin", XwinSessionHandler())
+    daemon.registerHandler("rsshscreen", RemoteSshScreenHandler())
     daemon.loop()
 
 
