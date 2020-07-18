@@ -4,6 +4,8 @@
 
 import socket
 import select
+import errno
+from time import sleep
 import sys
 import os
 # https://github.com/Ulauncher/ulauncher-timer/tree/master/timer
@@ -160,7 +162,7 @@ class Daemon(DaemonBase):
                         print('recv timed out, retry later')
                         continue
                     else:
-                        print e
+                        print(e)
                         sys.exit(1)
                 except socket.error as e:
                     err = e.args[0]
@@ -170,35 +172,29 @@ class Daemon(DaemonBase):
                         continue
                     else:
                         # a "real" error occurred
-                        print e
+                        print(e)
                         sys.exit(1)
                 else:
-                    if len(data) == 0:
+                    if len(data) > 0:
+                        self.log.warning('processConnection: while True: if data')
+                        msg += data.decode()
+                        # A readable client socket has data
+                        self.log.warning('received "%s" from %s' % (data, connection.getpeername()))
+                        # self.message_queues[connection].put(data)
+                        # # Add output channel for response
+                        if connection not in self.outputs:
+                            self.outputs.append(connection)
+
+                        # A readable socket without data available is from a client
+                        # that has disconnected, and the stream is ready to be
+                        # closed.
+                    else:
+                        # Interpret empty result as closed connection
+                        self.log.warning('no more data from %s' % client_address)
+                        self.log.warning('closing %s after reading no data' % client_address)
+                        # break
                         print('orderly shutdown on server end')
                         sys.exit(0)
-                    else:
-                        # got a message do something :)
-
-
-
-                if data:
-                    self.log.warning('processConnection: while True: if data')
-                    msg += data.decode()
-                    # A readable client socket has data
-                    self.log.warning('received "%s" from %s' % (data, connection.getpeername()))
-                    # self.message_queues[connection].put(data)
-                    # # Add output channel for response
-                    # if connection not in self.outputs:
-                    #     self.outputs.append(connection)
-
-                    # A readable socket without data available is from a client
-                    # that has disconnected, and the stream is ready to be
-                    # closed.
-                else:
-                    # Interpret empty result as closed connection
-                    self.log.warning('no more data from %s' % client_address)
-                    self.log.warning('closing %s after reading no data' % client_address)
-                    # break
         finally:
             # Add output channel for response
             self.message_queues[connection].put( msg.encode() )
