@@ -142,6 +142,8 @@ class Handler(DaemonBase):
 class RemoteSshScreenHandler(Handler):
     def __init__(self):
         Handler.__init__(self)
+    def run(self):
+        self.add(json)
 
 class XwinSessionHandler(Handler):
     Action = Enum('Action', ['Ignore', 'Select', 'Remind'], start=0)
@@ -153,6 +155,24 @@ class XwinSessionHandler(Handler):
         return {'cmd': "nocli",
                 'winid': "0",
                 'timetaken': 0}
+
+    def ask(self, json):
+        # https://github.com/bcbnz/python-rofi
+        r = rofi.Rofi()
+        winid    = int( json["winid"], 10 )
+        wtitle   = Utils.getWinTitle(winid)
+        wtitleId = "%s[%d]" % (wtitle, winid)
+        prompt   = "%s need your attention" % wtitleId
+        actions  = dict()
+
+        message = "Finished %s" % json['cmd']
+        actions[XwinSessionHandler.Action.Ignore] = "Ignore %s" % wtitleId
+        actions[XwinSessionHandler.Action.Select] = "Select %s" % wtitleId
+        actions[XwinSessionHandler.Action.Remind] = "Remind after 10 mins"
+        options = actions.values()
+        index, key = r.select(prompt, options, message )
+        self.log.warning("index %d, key %d" % (index, key))
+        return index
 
     def giveFocus(self, winid):
         Utils.focusWindId(winid)
@@ -172,24 +192,6 @@ class XwinSessionHandler(Handler):
             if XwinSessionHandler.Action.Select.value == self.ask(json):
                 self.giveFocus(winid)
         return True
-
-    def ask(self, json):
-        # https://github.com/bcbnz/python-rofi
-        r = rofi.Rofi()
-        winid    = int( json["winid"], 10 )
-        wtitle   = Utils.getWinTitle(winid)
-        wtitleId = "%s[%d]" % (wtitle, winid)
-        prompt   = "%s need your attention" % wtitleId
-        actions  = dict()
-
-        message = "Finished %s" % json['cmd']
-        actions[XwinSessionHandler.Action.Ignore] = "Ignore %s" % wtitleId
-        actions[XwinSessionHandler.Action.Select] = "Select %s" % wtitleId
-        actions[XwinSessionHandler.Action.Remind] = "Remind after 10 mins"
-        options = actions.values()
-        index, key = r.select(prompt, options, message )
-        self.log.warning("index %d, key %d" % (index, key))
-        return index
 
 def main():
     daemon = Daemon()

@@ -1,9 +1,10 @@
 # source: https://github.com/ihashacks/notifyosd.zsh/blob/master/notifyosd.zsh
 # commands to ignore
-cmdignore=(htop tmux top vim)
+cmdignore=(htop tmux top vim less)
 
 # set gt 0 to enable GNU units for time results
-gnuunits=0
+# gnuunits=0
+gnuunits=1
 
 USRDIR=/run/current-system/profile
 
@@ -50,7 +51,7 @@ function notifyosd-precmd()
               notify-send -i utilities-terminal \
 						              -u $urgency "$cmd_basename completed $cmdstat" "\"$cmd\" took $cmd_time"
           fi
-          ./client.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_time" cmd "$cmd" cmdstat "$cmdstat"
+          ./client.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
           if whence -p play >& /dev/null
           then
 						  play -q $sndstat
