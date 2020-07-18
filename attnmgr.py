@@ -72,6 +72,7 @@ class Daemon(DaemonBase):
     def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         DaemonBase.__init__(self)
         self.handlers = dict()
+        self.message_queues = dict()
         self.server_address = server_address
         self.mksocket()
 
@@ -85,6 +86,7 @@ class Daemon(DaemonBase):
                 raise
         # Create a UDS socket
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.setblocking(0)
         # Bind the socket to the port
         self.log.warning('starting up on %s' % self.server_address)
         self.sock.bind(self.server_address)
@@ -93,7 +95,7 @@ class Daemon(DaemonBase):
         self.sock.listen(5)
 
         self.servers = [ self.sock ]
-        self.inputs = [ self.sock ]
+        self.inputs  = [ self.sock ]
         self.outputs = [  ]
 
     def registerHandler(self, hdlrname, handler):
@@ -111,7 +113,7 @@ class Daemon(DaemonBase):
             table = list(js.keys())[0]
             self.processHandler(table, js[table])
 
-    def processConnection(self, connection, client_address):
+    def processConnection1(self, connection, client_address):
         try:
             self.log.warning('connection from %s' % client_address)
             msg = ""
@@ -139,6 +141,47 @@ class Daemon(DaemonBase):
             connection, client_address = self.sock.accept()
             self.processConnection(connection, client_address)
 
+
+    def processConnection(self, connection, client_address):
+        self.log.warning('processConnection(%s, %s)' % (connection, client_address))
+        try:
+            self.log.warning('connection from %s' % client_address)
+            msg = ""
+            while True:
+                self.log.warning('processConnection(%s, %s) while True:' % (connection, client_address))
+                data = connection.recv( Daemon.sockbuffLen )
+                if data:
+                    msg += data.decode()
+                    # A readable client socket has data
+                    self.log.warning('received "%s" from %s' % (data, connection.getpeername()))
+                    # self.message_queues[connection].put(data)
+                    # # Add output channel for response
+                    # if connection not in self.outputs:
+                    #     self.outputs.append(connection)
+                # A readable socket without data available is from a client
+                # that has disconnected, and the stream is ready to be
+                # closed.
+                else:
+                    # Interpret empty result as closed connection
+                    self.log.warning('no more data from %s' % client_address)
+                    self.log.warning('closing %s after reading no data' % client_address)
+                    break
+        finally:
+            # Add output channel for response
+            self.message_queues[connection].put( msg.encode() )
+            if connection not in self.outputs:
+                self.outputs.append(connection)
+            if connection in self.outputs:
+                self.outputs.remove( connection )
+            self.inputs.remove( connection )
+            connection.close()
+            # Remove message queue
+            del self.message_queues[connection]
+            self.log.warning('received msg = %s' % msg)
+            tableKv = json.loads(msg)
+            self.processJson(tableKv)
+
+
     def loop(self):
         # https://pymotw.com/2/select/
         # Sockets from which we expect to read
@@ -154,7 +197,7 @@ class Daemon(DaemonBase):
         # to act as a buffer for the data to be sent through it.
 
         # Outgoing message queues (socket:Queue)
-        message_queues = {}
+        # self.message_queues = {}
 
         # The main portion of the server program loops, calling select() to
         # block and wait for network activity.
@@ -182,6 +225,7 @@ class Daemon(DaemonBase):
 
             # Handle self.inputs
             for s in readable:
+                self.log.warning('loop for s=%s', s)
                 if s in self.servers:
                     # A "readable" server socket is ready to accept a connection
                     connection, client_address = s.accept()
@@ -190,36 +234,38 @@ class Daemon(DaemonBase):
                     self.inputs.append(connection)
 
                     # Give the connection a queue for data we want to send
-                    message_queues[connection] = queue.Queue()
+                    self.message_queues[connection] = queue.Queue()
 
                     # The next case is an established connection with a client
                     # that has sent data. The data is read with recv(), then
                     # placed on the queue so it can be sent through the socket
                     # and back to the client.
                 else:
-                    data = s.recv( Daemon.sockbuffLen )
-                    if data:
-                        # A readable client socket has data
-                        self.log.warning('received "%s" from %s' % (data, s.getpeername()))
-                        message_queues[s].put(data)
-                        # Add output channel for response
-                        if s not in self.outputs:
-                            self.outputs.append(s)
+                    self.log.warning('existing connection from %s' % client_address)
+                    self.processConnection(s, client_address)
+                    # data = s.recv( Daemon.sockbuffLen )
+                    # if data:
+                    #     # A readable client socket has data
+                    #     self.log.warning('received "%s" from %s' % (data, s.getpeername()))
+                    #     self.message_queues[s].put(data)
+                    #     # Add output channel for response
+                    #     if s not in self.outputs:
+                    #         self.outputs.append(s)
 
-                    # A readable socket without data available is from a client
-                    # that has disconnected, and the stream is ready to be
-                    # closed.
-                    else:
-                        # Interpret empty result as closed connection
-                        self.log.warning('closing %s after reading no data' % client_address)
-                        # Stop listening for input on the connection
-                        if s in self.outputs:
-                            self.outputs.remove(s)
-                        self.inputs.remove(s)
-                        s.close()
+                    # # A readable socket without data available is from a client
+                    # # that has disconnected, and the stream is ready to be
+                    # # closed.
+                    # else:
+                    #     # Interpret empty result as closed connection
+                    #     self.log.warning('closing %s after reading no data' % client_address)
+                    #     # Stop listening for input on the connection
+                    #     if s in self.outputs:
+                    #         self.outputs.remove(s)
+                    #     self.inputs.remove(s)
+                    #     s.close()
 
-                        # Remove message queue
-                        del message_queues[s]
+                    #     # Remove message queue
+                    #     del self.message_queues[s]
 
             # There are fewer cases for the writable connections. If there is
             # data in the queue for a connection, the next message is sent.
@@ -230,7 +276,7 @@ class Daemon(DaemonBase):
             # Handle self.outputs
             for s in writable:
                 try:
-                    next_msg = message_queues[s].get_nowait()
+                    next_msg = self.message_queues[s].get_nowait()
                 except queue.Empty:
                     # No messages waiting so stop checking for writability.
                     self.log.warning('output queue for %s is empty' % s.getpeername())
@@ -251,7 +297,7 @@ class Daemon(DaemonBase):
                 s.close()
 
                 # Remove message queue
-                del message_queues[s]
+                del self.message_queues[s]
 
 
 class Handler(DaemonBase):
