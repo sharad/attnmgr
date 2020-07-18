@@ -148,10 +148,19 @@ class XwinSessionHandler(Handler):
     def __init__(self):
         Handler.__init__(self)
 
+    def defaultJson(self):
+        return {'cmd': "nocli",
+                'winid': "0",
+                'timetaken': 0}
+
     def giveFocus(self):
         getActiveWindowId()
 
     def run(self, json):
+        default =  self.defaultJson();
+        self.log.warning('running client with default = %s' % default)
+        default.update( json )
+        json = default
         self.log.warning('running client with json = %s' % json)
         winid        = int( json["winid"], 10 )
         activewinid  = int( Utils.getActiveWindowId(), 16 )
@@ -174,8 +183,7 @@ class XwinSessionHandler(Handler):
         prompt   = "%s need your attention" % wtitleId
         actions  = dict()
 
-        message = "Finished %s" % json[cmd]
-
+        message = "Finished %s" % json['cmd']
         actions[XwinSessionHandler.Action.Ignore] = "Ignore %s" % wtitleId
         actions[XwinSessionHandler.Action.Select] = "Select %s" % wtitleId
         actions[XwinSessionHandler.Action.Remind] = "Remind after 10 mins"
