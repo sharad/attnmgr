@@ -119,8 +119,8 @@ class Daemon(DaemonBase):
             msg = ""
             # Receive the data in small chunks and retransmit it
             while True:
-                data    = connection.recv( Daemon.sockbuffLen )
-                msg += data.decode()
+                data =  connection.recv( Daemon.sockbuffLen )
+                msg  += data.decode()
                 if data:
                     self.log.warning('sending data back to the client')
                     connection.sendall(data)
@@ -149,7 +149,38 @@ class Daemon(DaemonBase):
             msg = ""
             while True:
                 self.log.warning('processConnection: while True:')
-                data = connection.recv( Daemon.sockbuffLen )
+                try:            # https://stackoverflow.com/questions/16745409/what-does-pythons-socket-recv-return-for-non-blocking-sockets-if-no-data-is-r
+                    data = connection.recv( Daemon.sockbuffLen )
+                except socket.timeout as e:
+                    err = e.args[0]
+                    # this next if/else is a bit redundant, but illustrates how the
+                    # timeout exception is setup
+                    if err == 'timed out':
+                        sleep(1)
+                        print('recv timed out, retry later')
+                        continue
+                    else:
+                        print e
+                        sys.exit(1)
+                except socket.error as e:
+                    err = e.args[0]
+                    if err == errno.EAGAIN or err == errno.EWOULDBLOCK:
+                        sleep(1)
+                        print('No data available')
+                        continue
+                    else:
+                        # a "real" error occurred
+                        print e
+                        sys.exit(1)
+                else:
+                    if len(data) == 0:
+                        print('orderly shutdown on server end')
+                        sys.exit(0)
+                    else:
+                        # got a message do something :)
+
+
+
                 if data:
                     self.log.warning('processConnection: while True: if data')
                     msg += data.decode()
@@ -159,26 +190,27 @@ class Daemon(DaemonBase):
                     # # Add output channel for response
                     # if connection not in self.outputs:
                     #     self.outputs.append(connection)
-                # A readable socket without data available is from a client
-                # that has disconnected, and the stream is ready to be
-                # closed.
+
+                    # A readable socket without data available is from a client
+                    # that has disconnected, and the stream is ready to be
+                    # closed.
                 else:
                     # Interpret empty result as closed connection
                     self.log.warning('no more data from %s' % client_address)
                     self.log.warning('closing %s after reading no data' % client_address)
-                    break
+                    # break
         finally:
             # Add output channel for response
             self.message_queues[connection].put( msg.encode() )
-            if connection not in self.outputs:
-                self.outputs.append(connection)
+            # if connection not in self.outputs:
+            #     self.outputs.append(connection)
             if connection in self.outputs:
                 self.outputs.remove( connection )
             self.inputs.remove( connection )
             connection.close()
             # Remove message queue
             del self.message_queues[connection]
-            self.log.warning('received msg = %s' % msg)
+            self.log.warning('finally received msg = %s' % msg)
             tableKv = json.loads(msg)
             self.processJson(tableKv)
 
