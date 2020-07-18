@@ -3,6 +3,7 @@
 # https://pymotw.com/2/select/
 
 import socket
+import select
 import sys
 import os
 # https://github.com/Ulauncher/ulauncher-timer/tree/master/timer
@@ -13,6 +14,7 @@ import json
 import rofi
 import subprocess
 import re
+import queue
 from enum import Enum, unique, auto
 
 
@@ -88,7 +90,7 @@ class Daemon(DaemonBase):
         self.sock.bind(self.server_address)
 
         # Listen for incoming connections
-        self.sock.listen(1)
+        self.sock.listen(5)
 
         self.inputs = [ self.sock ]
         self.outputs = [  ]
@@ -180,15 +182,15 @@ class Daemon(DaemonBase):
             # Handle self.inputs
             for s in readable:
 
-                if s is server:
+                if s is self.sock:
                     # A "readable" server socket is ready to accept a connection
                     connection, client_address = s.accept()
-                    self.log.warning('new connection from', client_address)
+                    self.log.warning('new connection from %s' % client_address)
                     connection.setblocking(0)
                     self.inputs.append(connection)
 
                     # Give the connection a queue for data we want to send
-                    message_queues[connection] = Queue.Queue()
+                    message_queues[connection] = queue.Queue()
 
                     # The next case is an established connection with a client
                     # that has sent data. The data is read with recv(), then
@@ -229,7 +231,7 @@ class Daemon(DaemonBase):
             for s in writable:
                 try:
                     next_msg = message_queues[s].get_nowait()
-                except Queue.Empty:
+                except queue.Empty:
                     # No messages waiting so stop checking for writability.
                     self.log.warning('output queue for %s is empty' % s.getpeername())
                     self.outputs.remove(s)
