@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# https://pymotw.com/2/select/
+
 import socket
 import sys
 import os
