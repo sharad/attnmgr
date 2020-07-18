@@ -92,6 +92,7 @@ class Daemon(DaemonBase):
         # Listen for incoming connections
         self.sock.listen(5)
 
+        self.servers = [ self.sock ]
         self.inputs = [ self.sock ]
         self.outputs = [  ]
 
@@ -181,8 +182,7 @@ class Daemon(DaemonBase):
 
             # Handle self.inputs
             for s in readable:
-
-                if s is self.sock:
+                if s in self.servers:
                     # A "readable" server socket is ready to accept a connection
                     connection, client_address = s.accept()
                     self.log.warning('new connection from %s' % client_address)
