@@ -65,7 +65,7 @@ class Utils(DaemonBase):
 class Daemon(DaemonBase):
     sockbuffLen = 1024
 
-    def __init__(self, server_address = './uds_socket'):
+    def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         DaemonBase.__init__(self)
         self.handlers = dict()
         self.server_address = server_address
@@ -74,14 +74,13 @@ class Daemon(DaemonBase):
     def mksocket(self):
         # Make sure the socket does not already exist
         try:
+            os.makedirs( os.path.dirname( self.server_address ), exist_ok = True )
             os.unlink(self.server_address)
         except OSError:
             if os.path.exists(self.server_address):
                 raise
-
         # Create a UDS socket
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-
         # Bind the socket to the port
         self.log.warning('starting up on %s' % self.server_address)
         self.sock.bind(self.server_address)
@@ -153,14 +152,13 @@ class XwinSessionHandler(Handler):
                 'winid': "0",
                 'timetaken': 0}
 
-    def giveFocus(self):
-        getActiveWindowId()
+    def giveFocus(self, winid):
+        Utils.focusWindId(winid)
 
     def run(self, json):
         default =  self.defaultJson();
-        self.log.warning('running client with default = %s' % default)
         default.update( json )
-        json = default
+        json    = default
         self.log.warning('running client with json = %s' % json)
         winid        = int( json["winid"], 10 )
         activewinid  = int( Utils.getActiveWindowId(), 16 )
@@ -170,8 +168,7 @@ class XwinSessionHandler(Handler):
         else:
             self.log.warning("window %s[%d] not have focus" % (wtitle, winid))
             if XwinSessionHandler.Action.Select.value == self.ask(json):
-                Utils.focusWindId(winid)
-            # self.ask(json)
+                self.giveFocus(winid)
         return True
 
     def ask(self, json):

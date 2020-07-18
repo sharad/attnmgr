@@ -4,13 +4,14 @@
 
 import socket
 import sys
+import os
 import logging
 import json
 
 class Client:
     sockbuffLen = 1024
 
-    def __init__(self, server_address = './uds_socket'):
+    def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         logging.basicConfig(format='%(message)s')
         self.log            = logging.getLogger(__name__)
         self.server_address = server_address
