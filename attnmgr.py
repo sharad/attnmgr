@@ -148,9 +148,10 @@ class Daemon(DaemonBase):
             self.log.warning('connection from %s' % client_address)
             msg = ""
             while True:
-                self.log.warning('processConnection(%s, %s) while True:' % (connection, client_address))
+                self.log.warning('processConnection: while True:')
                 data = connection.recv( Daemon.sockbuffLen )
                 if data:
+                    self.log.warning('processConnection: while True: if data')
                     msg += data.decode()
                     # A readable client socket has data
                     self.log.warning('received "%s" from %s' % (data, connection.getpeername()))
