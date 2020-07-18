@@ -90,6 +90,9 @@ class Daemon(DaemonBase):
         # Listen for incoming connections
         self.sock.listen(1)
 
+        self.inputs = [ self.sock ]
+        self.outputs = [  ]
+
     def registerHandler(self, hdlrname, handler):
         self.handlers[hdlrname] = handler
 
@@ -136,10 +139,10 @@ class Daemon(DaemonBase):
     def loop(self):
         # https://pymotw.com/2/select/
         # Sockets from which we expect to read
-        inputs = [ server ]
+        # self.inputs = [ server ]
 
         # Sockets to which we expect to write
-        outputs = [ ]
+        # self.outputs = [ ]
 
         # Connections are added to and removed from these lists by the server
         # main loop. Since this version of the server is going to wait for a
@@ -153,11 +156,11 @@ class Daemon(DaemonBase):
         # The main portion of the server program loops, calling select() to
         # block and wait for network activity.
 
-        while inputs:
+        while self.inputs:
 
             # Wait for at least one of the sockets to be ready for processing
             self.log.warning('\nwaiting for the next event')
-            readable, writable, exceptional = select.select(inputs, outputs, inputs)
+            readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs)
 
             # select() returns three new lists, containing subsets of the
             # contents of the lists passed in. All of the sockets in the
@@ -171,10 +174,10 @@ class Daemon(DaemonBase):
             # socket is the main “server” socket, the one being used to listen
             # for connections, then the “readable” condition means it is ready
             # to accept another incoming connection. In addition to adding the
-            # new connection to the list of inputs to monitor, this section
+            # new connection to the list of self.inputs to monitor, this section
             # sets the client socket to not block.
 
-            # Handle inputs
+            # Handle self.inputs
             for s in readable:
 
                 if s is server:
@@ -182,7 +185,7 @@ class Daemon(DaemonBase):
                     connection, client_address = s.accept()
                     self.log.warning('new connection from', client_address)
                     connection.setblocking(0)
-                    inputs.append(connection)
+                    self.inputs.append(connection)
 
                     # Give the connection a queue for data we want to send
                     message_queues[connection] = Queue.Queue()
@@ -198,8 +201,8 @@ class Daemon(DaemonBase):
                         self.log.warning('received "%s" from %s' % (data, s.getpeername()))
                         message_queues[s].put(data)
                         # Add output channel for response
-                        if s not in outputs:
-                            outputs.append(s)
+                        if s not in self.outputs:
+                            self.outputs.append(s)
 
                     # A readable socket without data available is from a client
                     # that has disconnected, and the stream is ready to be
@@ -208,9 +211,9 @@ class Daemon(DaemonBase):
                         # Interpret empty result as closed connection
                         self.log.warning('closing %s after reading no data' % client_address)
                         # Stop listening for input on the connection
-                        if s in outputs:
-                            outputs.remove(s)
-                        inputs.remove(s)
+                        if s in self.outputs:
+                            self.outputs.remove(s)
+                        self.inputs.remove(s)
                         s.close()
 
                         # Remove message queue
@@ -222,14 +225,14 @@ class Daemon(DaemonBase):
             # connections so that the next time through the loop select() does
             # not indicate that the socket is ready to send data.
 
-            # Handle outputs
+            # Handle self.outputs
             for s in writable:
                 try:
                     next_msg = message_queues[s].get_nowait()
                 except Queue.Empty:
                     # No messages waiting so stop checking for writability.
                     self.log.warning('output queue for %s is empty' % s.getpeername())
-                    outputs.remove(s)
+                    self.outputs.remove(s)
                 else:
                     self.log.warning('sending "%s" to %s' % (next_msg, s.getpeername()))
                     s.send(next_msg)
@@ -240,9 +243,9 @@ class Daemon(DaemonBase):
             for s in exceptional:
                 self.log.warning('handling exceptional condition for %s' % s.getpeername())
                 # Stop listening for input on the connection
-                inputs.remove(s)
-                if s in outputs:
-                    outputs.remove(s)
+                self.inputs.remove(s)
+                if s in self.outputs:
+                    self.outputs.remove(s)
                 s.close()
 
                 # Remove message queue
