@@ -17,7 +17,38 @@ import rofi
 import subprocess
 import re
 import queue
+import threading
 from enum import Enum, unique, auto
+
+
+# ##### example #####
+# import threading, queue
+
+# q = queue.Queue()
+
+# def worker():
+#     while True:
+#         item = q.get()
+#         print(f'Working on {item}')
+#         print(f'Finished {item}')
+#         q.task_done()
+
+# # turn-on the worker thread
+# threading.Thread(target=worker, daemon=True).start()
+
+# # send thirty task requests to the worker
+# for item in range(30):
+#     q.put(item)
+# print('All task requests sent\n', end='')
+
+# # block until all tasks are done
+# q.join()
+# print('All work completed')
+# ##### example #####
+
+
+
+
 
 
 class DaemonBase(object):
@@ -65,9 +96,6 @@ class Utils(DaemonBase):
         if match != None:
             return match.group("name").decode()
 
-
-
-
 class Daemon(DaemonBase):
     sockbuffLen = 1024
 
@@ -88,17 +116,17 @@ class Daemon(DaemonBase):
             if os.path.exists(self.server_address):
                 raise
         # Create a UDS socket
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.setblocking(0)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.setblocking(0)
         # Bind the socket to the port
         self.log.warning('starting up on %s' % self.server_address)
-        self.sock.bind(self.server_address)
+        sock.bind(self.server_address)
 
         # Listen for incoming connections
-        self.sock.listen(5)
+        sock.listen(5)
 
-        self.servers = [ self.sock ]
-        self.inputs  = [ self.sock ]
+        self.servers = [ sock ]
+        self.inputs  = [ sock ]
         self.outputs = [  ]
 
     def registerHandler(self, hdlrname, handler):
@@ -124,38 +152,6 @@ class Daemon(DaemonBase):
             return False
         return True
 
-
-
-    def processConnection1(self, connection, client_address):
-        try:
-            self.log.warning('connection from %s' % client_address)
-            msg = ""
-            # Receive the data in small chunks and retransmit it
-            while True:
-                data =  connection.recv( Daemon.sockbuffLen )
-                msg  += data.decode()
-                if data:
-                    self.log.warning('sending data back to the client')
-                    connection.sendall(data)
-                else:
-                    self.log.warning('no more data from %s' % client_address)
-                    break
-        finally:
-            # Clean up the connection
-            connection.close()
-            self.log.warning('received msg = %s' % msg)
-            tableKv = json.loads(msg)
-            self.processJson(tableKv)
-
-    def loop1(self):
-        while True:
-            # Wait for a connection
-            self.log.warning('waiting for a connection')
-            connection, client_address = self.sock.accept()
-            self.processConnection(connection, client_address)
-
-
-
     def processConnection(self, s, client_address):
         self.log.warning('existing connection from %s' % client_address)
         data = s.recv( Daemon.sockbuffLen )
@@ -176,7 +172,7 @@ class Daemon(DaemonBase):
                 if s not in self.outputs:
                     self.outputs.append(s)
             else:
-                self.message_queues[s].put("ok")
+                self.message_queues[s].put("not processed")
                 # Add output channel for response
                 if s not in self.outputs:
                     self.outputs.append(s)
@@ -197,7 +193,7 @@ class Daemon(DaemonBase):
         while self.inputs:
             # Wait for at least one of the sockets to be ready for processing
             self.log.warning('\nwaiting for the next event')
-            readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs)
+            readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs, 1)
             for s in readable:
                 self.log.warning('loop for s=%s', s)
                 if s in self.servers:

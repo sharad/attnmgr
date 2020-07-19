@@ -2,6 +2,7 @@
 # send table key value ...pairs
 
 from time import sleep
+import select
 import socket
 import sys
 import os
@@ -31,38 +32,22 @@ class Client:
                 self.log.warning(msg)
                 sys.exit(1)
 
-    def send1(self, msg):
-        try:
-            # Send data
-            # msg = 'This is the msg.  It will be repeated.'
-            byt = msg.encode()
-
-            self.log.warning('sending "%s"' % msg)
-            self.sock.sendall(byt)
-
-            amount_received = 0
-            amount_expected = len(msg)
-
-            while amount_received < amount_expected:
-                data = self.sock.recv( Client.sockbuffLen )
-                amount_received += len(data)
-                self.log.warning('received "%s"' % data)
-        finally:
-            self.log.warning('closing socket')
-            self.sock.close()
-
     def send(self, msg):
-        s = self.sock
-        self.log.warning('%s: sending "%s"' % (s.getsockname(), msg))
-        s.send(msg.encode())
-        sleep(1)
-        data = s.recv( Client.sockbuffLen )
-        self.log.warning('%s: received "%s"' % (s.getsockname(), data.decode()))
-        if not data:
-            self.log.warning('closing socket', s.getsockname())
-            s.close()
+        sock = self.sock
+        try:
+            timeout_in_seconds = 1
+            self.log.warning('%s: sending "%s"' % (sock.getsockname(), msg))
+            sock.send(msg.encode())
 
-
+            # https://stackoverflow.com/a/2721734
+            readable, writable, exceptional = select.select([sock], [], [], timeout_in_seconds)
+            for s in readable:
+                data = s.recv( Client.sockbuffLen )
+                if data:
+                    self.log.warning('%s: received "%s"' % (s.getsockname(), data.decode()))
+        finally:
+            self.log.warning('closing socket %s' % sock.getsockname())
+            sock.close()
 
 def listToDict(lst):
     op = {lst[i]: lst[i + 1] for i in range(0, len(lst), 2)}
