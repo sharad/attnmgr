@@ -73,8 +73,9 @@ class Daemon(DaemonBase):
 
     def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         DaemonBase.__init__(self)
-        self.handlers = dict()
-        self.message_queues = dict()
+        self.handlers = {}
+        self.message_queues = {}
+        self.message_js = {}
         self.server_address = server_address
         self.mksocket()
 
@@ -114,6 +115,16 @@ class Daemon(DaemonBase):
         if 1 == len(js):
             table = list(js.keys())[0]
             self.processHandler(table, js[table])
+            return "ok"
+
+    def is_json(self, myjson):
+        try:
+            json_object = json.loads(myjson)
+        except ValueError as e:
+            return False
+        return True
+
+
 
     def processConnection1(self, connection, client_address):
         try:
@@ -143,12 +154,6 @@ class Daemon(DaemonBase):
             connection, client_address = self.sock.accept()
             self.processConnection(connection, client_address)
 
-    def is_json(self, myjson):
-        try:
-            json_object = json.loads(myjson)
-        except ValueError as e:
-            return False
-        return True
 
 
     def processConnection(self, s, client_address):
@@ -157,10 +162,24 @@ class Daemon(DaemonBase):
         if data:
             # A readable client socket has data
             self.log.warning('received "%s" from %s' % (data, s.getpeername()))
-            self.message_queues[s].put(data)
-            # Add output channel for response
-            if s not in self.outputs:
-                self.outputs.append(s)
+            if s in self.message_js:
+                self.message_js[s] += data.decode()
+            else:
+                self.message_js[s] = data.decode()
+
+            if self.is_json( self.message_js[s] ):
+                tableKv = json.loads( self.message_js[s] )
+                response = self.processJson(tableKv)
+                self.log.warning('response "%s" to %s' % (response, s.getpeername()))
+                self.message_queues[s].put( response )
+                # Add output channel for response
+                if s not in self.outputs:
+                    self.outputs.append(s)
+            else:
+                self.message_queues[s].put("ok")
+                # Add output channel for response
+                if s not in self.outputs:
+                    self.outputs.append(s)
         else:
             # Interpret empty result as closed connection
             self.log.warning('closing %s after reading no data' % client_address)
@@ -175,7 +194,6 @@ class Daemon(DaemonBase):
 
     def loop(self):
         # https://pymotw.com/2/select/
-
         while self.inputs:
             # Wait for at least one of the sockets to be ready for processing
             self.log.warning('\nwaiting for the next event')
@@ -193,7 +211,6 @@ class Daemon(DaemonBase):
                 else:
                     self.processConnection(s, client_address)
 
-            # Handle self.outputs
             for s in writable:
                 try:
                     next_msg = self.message_queues[s].get_nowait()
@@ -203,10 +220,8 @@ class Daemon(DaemonBase):
                     self.outputs.remove(s)
                 else:
                     self.log.warning('sending "%s" to %s' % (next_msg, s.getpeername()))
-                    s.send(next_msg)
+                    s.send(next_msg.encode())
 
-            # Finally, if there is an error with a socket, it is closed.
-            # Handle "exceptional conditions"
             for s in exceptional:
                 self.log.warning('handling exceptional condition for %s' % s.getpeername())
                 # Stop listening for input on the connection
@@ -214,8 +229,6 @@ class Daemon(DaemonBase):
                 if s in self.outputs:
                     self.outputs.remove(s)
                 s.close()
-
-                # Remove message queue
                 del self.message_queues[s]
 
 

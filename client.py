@@ -31,7 +31,6 @@ for message in messages:
     for s in socks:
         print('%s: sending "%s"' % (s.getsockname(), message))
         s.send(message.encode())
-
     # Read responses on both sockets
     for s in socks:
         data = s.recv(1024)

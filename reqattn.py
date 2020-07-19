@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # send table key value ...pairs
 
-
+from time import sleep
 import socket
 import sys
 import os
@@ -31,43 +31,37 @@ class Client:
                 self.log.warning(msg)
                 sys.exit(1)
 
-    # def send(self, msg):
-    #     try:
-    #         # Send data
-    #         # msg = 'This is the msg.  It will be repeated.'
-    #         byt = msg.encode()
+    def send1(self, msg):
+        try:
+            # Send data
+            # msg = 'This is the msg.  It will be repeated.'
+            byt = msg.encode()
 
-    #         self.log.warning('sending "%s"' % msg)
-    #         self.sock.sendall(byt)
+            self.log.warning('sending "%s"' % msg)
+            self.sock.sendall(byt)
 
-    #         amount_received = 0
-    #         amount_expected = len(msg)
+            amount_received = 0
+            amount_expected = len(msg)
 
-    #         while amount_received < amount_expected:
-    #             data = self.sock.recv( Client.sockbuffLen )
-    #             amount_received += len(data)
-    #             self.log.warning('received "%s"' % data)
-
-    #     finally:
-    #         self.log.warning('closing socket')
-    #         self.sock.close()
+            while amount_received < amount_expected:
+                data = self.sock.recv( Client.sockbuffLen )
+                amount_received += len(data)
+                self.log.warning('received "%s"' % data)
+        finally:
+            self.log.warning('closing socket')
+            self.sock.close()
 
     def send(self, msg):
-        messages = [ msg ]
-        for message in messages:
+        s = self.sock
+        self.log.warning('%s: sending "%s"' % (s.getsockname(), msg))
+        s.send(msg.encode())
+        sleep(1)
+        data = s.recv( Client.sockbuffLen )
+        self.log.warning('%s: received "%s"' % (s.getsockname(), data.decode()))
+        if not data:
+            self.log.warning('closing socket', s.getsockname())
+            s.close()
 
-            # Send messages on both sockets
-            for s in self.socks:
-                self.log.warning('%s: sending "%s"' % (s.getsockname(), message))
-                s.send(message.encode())
-
-            # Read responses on both sockets
-            for s in self.socks:
-                data = s.recv(1024)
-                self.log.warning('%s: received "%s"' % (s.getsockname(), data))
-                if not data:
-                    self.log.warning('closing socket', s.getsockname())
-                    s.close()
 
 
 def listToDict(lst):
