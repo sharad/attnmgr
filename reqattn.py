@@ -20,36 +20,54 @@ class Client:
     def connect(self):
         # Create a UDS socket
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-
+        self.sock.setblocking(False)
+        self.socks = [ self.sock ]
         # Connect the socket to the port where the server is listening
         self.log.warning('connecting to %s' % self.server_address)
-        try:
-            self.sock.connect(self.server_address)
-        except socket.error as msg:
-            self.log.warning(msg)
-            sys.exit(1)
+        for s in self.socks:
+            try:
+                s.connect(self.server_address)
+            except socket.error as msg:
+                self.log.warning(msg)
+                sys.exit(1)
+
+    # def send(self, msg):
+    #     try:
+    #         # Send data
+    #         # msg = 'This is the msg.  It will be repeated.'
+    #         byt = msg.encode()
+
+    #         self.log.warning('sending "%s"' % msg)
+    #         self.sock.sendall(byt)
+
+    #         amount_received = 0
+    #         amount_expected = len(msg)
+
+    #         while amount_received < amount_expected:
+    #             data = self.sock.recv( Client.sockbuffLen )
+    #             amount_received += len(data)
+    #             self.log.warning('received "%s"' % data)
+
+    #     finally:
+    #         self.log.warning('closing socket')
+    #         self.sock.close()
 
     def send(self, msg):
-        try:
-            # Send data
-            # msg = 'This is the msg.  It will be repeated.'
-            byt = msg.encode()
+        messages = [ msg ]
+        for message in messages:
 
-            self.log.warning('sending "%s"' % msg)
-            self.sock.sendall(byt)
+            # Send messages on both sockets
+            for s in self.socks:
+                self.log.warning('%s: sending "%s"' % (s.getsockname(), message))
+                s.send(message.encode())
 
-            amount_received = 0
-            amount_expected = len(msg)
-
-            while amount_received < amount_expected:
-                data = self.sock.recv( Client.sockbuffLen )
-                amount_received += len(data)
-                self.log.warning('received "%s"' % data)
-
-        finally:
-            self.log.warning('closing socket')
-            self.sock.close()
-
+            # Read responses on both sockets
+            for s in self.socks:
+                data = s.recv(1024)
+                self.log.warning('%s: received "%s"' % (s.getsockname(), data))
+                if not data:
+                    self.log.warning('closing socket', s.getsockname())
+                    s.close()
 
 
 def listToDict(lst):
@@ -73,3 +91,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
+
+
+
