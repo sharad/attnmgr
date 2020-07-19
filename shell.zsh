@@ -51,7 +51,7 @@ function notifyosd-precmd()
               notify-send -i utilities-terminal \
 						              -u $urgency "$cmd_basename completed $cmdstat" "\"$cmd\" took $cmd_time"
           fi
-          ./client.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
+          ./reqattn.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
           if whence -p play >& /dev/null
           then
 						  play -q $sndstat
