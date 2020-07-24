@@ -19,7 +19,9 @@ import re
 import queue
 import threading
 from enum import Enum, unique, auto
-
+# https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+from paramiko import SSHClient
+from scp import SCPClient
 
 # ##### example #####
 # import threading, queue
@@ -110,10 +112,16 @@ class Worker(threading.Thread, DaemonBase):
         self.kwargs = kwargs
         self.handler = kwargs['handler']
         self.q      = queue.Queue()
-        self.start()
+        self.swapened = False
         return
 
+    def swapen(self):
+        if False == self.swapened:
+            self.start()
+            self.swapened = True
+
     def put(self, msg):
+        self.swapen()
         self.q.put(msg)
 
     def get(self):
@@ -134,7 +142,8 @@ class Worker(threading.Thread, DaemonBase):
             peername = sock.getpeername()
             response = self.handler.run(js)
             self.log.warning('response "%s" to %s' % (response, peername))
-            daemon.message_queues[sock].put(response)
+            if sock in daemon.message_queues:
+                daemon.message_queues[sock].put(response)
             print(f'Finished {item}')
             self.done()
 
@@ -164,13 +173,12 @@ class Daemon(DaemonBase):
         # Bind the socket to the port
         self.log.warning('starting up on %s' % self.server_address)
         sock.bind(self.server_address)
-
         # Listen for incoming connections
         sock.listen(5)
-
-        self.servers = [ sock ]
-        self.inputs  = [ sock ]
-        self.outputs = [  ]
+        self.servers      = [ sock ]
+        self.inputs       = [ sock ]
+        self.outputs      = [  ]
+        self.cleanupsocks = []
 
     def registerHandler(self, hdlrname, handler):
         # self.handlers[hdlrname] = handler
@@ -195,6 +203,31 @@ class Daemon(DaemonBase):
             return False
         return True
 
+    def scheduleCleanup(self, s):
+        if s not in self.outputs and s not in self.inputs:
+            if s not in self.cleanupsocks:
+                self.log.warning('scheduling %s to be removed' % s.getpeername())
+                self.cleanupsocks.append(s)
+
+    def tryToClose(self, s):
+        if s not in self.outputs and s not in self.inputs:
+            if s in self.cleanupsocks:
+                self.close(s)
+        if s in self.cleanupsocks:
+            self.cleanupsocks.remove(s)
+
+    def close(self, s):
+        self.log.warning('closing %s' % s.getpeername())
+        if s in self.outputs:
+            self.outputs.remove(s)
+        if s in self.inputs:
+            self.inputs.remove(s)
+        if s in self.cleanupsocks:
+            self.cleanupsocks.remove(s)
+        if s in self.message_queues:
+            del self.message_queues[s]
+        s.close()
+
     def processConnection(self, s, client_address):
         self.log.warning('existing connection from %s' % client_address)
         data = s.recv( Daemon.sockbuffLen )
@@ -217,22 +250,15 @@ class Daemon(DaemonBase):
                 if s not in self.outputs:
                     self.outputs.append(s)
         else:
-            # Interpret empty result as closed connection
-            self.log.warning('closing %s after reading no data' % client_address)
-            # Stop listening for input on the connection
-            if s in self.outputs:
-                self.outputs.remove(s)
             self.inputs.remove(s)
-            s.close()
-            # Remove message queue
-            del self.message_queues[s]
-
+            self.scheduleCleanup(s)
 
     def loop(self):
         # https://pymotw.com/2/select/
         while self.inputs:
             # Wait for at least one of the sockets to be ready for processing
-            self.log.warning('\nwaiting for the next event')
+            if False:
+                self.log.warning('\nwaiting for the next event')
             readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs, 1)
             for s in readable:
                 self.log.warning('loop for s=%s', s)
@@ -254,6 +280,7 @@ class Daemon(DaemonBase):
                     # No messages waiting so stop checking for writability.
                     self.log.warning('output queue for %s is empty' % s.getpeername())
                     self.outputs.remove(s)
+                    self.scheduleCleanup(s)
                 else:
                     self.log.warning('sending "%s" to %s' % (next_msg, s.getpeername()))
                     s.send(next_msg.encode())
@@ -261,11 +288,12 @@ class Daemon(DaemonBase):
             for s in exceptional:
                 self.log.warning('handling exceptional condition for %s' % s.getpeername())
                 # Stop listening for input on the connection
-                self.inputs.remove(s)
-                if s in self.outputs:
-                    self.outputs.remove(s)
-                s.close()
-                del self.message_queues[s]
+                # self.inputs.remove(s)
+                self.close(s)
+
+            for s in self.cleanupsocks:
+                self.tryToClose(s)
+
 
 
 class Handler(DaemonBase):
@@ -274,28 +302,33 @@ class Handler(DaemonBase):
         print()
 
 class RemoteSshScreenHandler(Handler):
+    _defaultJson  = {'server': "nocli",
+                     'session': "tbnl",
+                     'timetaken': 0}
     def __init__(self):
         Handler.__init__(self)
 
+    def defaultJson(self, json):
+        default =  RemoteSshScreenHandler._defaultJson;
+        default.update( json )
+        return default
 
-    def defaultJson(self):
-        return {'cmd': "nocli",
-                'winid': "0",
-                'timetaken': 0}
-
-    def run(self):
+    def run(self, json):
         self.add(json)
 
 class XwinSessionHandler(Handler):
     Action = Enum('Action', ['Ignore', 'Select', 'Remind'], start=0)
+    _defaultJson  = {'cmd': "nocli",
+                     'winid': "0",
+                     'timetaken': 0}
 
     def __init__(self):
         Handler.__init__(self)
 
-    def defaultJson(self):
-        return {'cmd': "nocli",
-                'winid': "0",
-                'timetaken': 0}
+    def defaultJson(self, json):
+        default =  XwinSessionHandler._defaultJson;
+        default.update( json )
+        return default
 
     def ask(self, json):
         # https://github.com/bcbnz/python-rofi
@@ -319,9 +352,7 @@ class XwinSessionHandler(Handler):
         Utils.focusWindId(winid)
 
     def run(self, json):
-        default =  self.defaultJson();
-        default.update( json )
-        json    = default
+        json =  self.defaultJson(json);
         self.log.warning('running client with json = %s' % json)
         winid        = int( json["winid"], 10 )
         activewinid  = int( Utils.getActiveWindowId(), 16 )
