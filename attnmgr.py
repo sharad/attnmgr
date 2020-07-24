@@ -46,11 +46,6 @@ from enum import Enum, unique, auto
 # print('All work completed')
 # ##### example #####
 
-
-
-
-
-
 class DaemonBase(object):
     def __init__(self):
         logging.basicConfig(format='%(message)s')
@@ -96,6 +91,35 @@ class Utils(DaemonBase):
         if match != None:
             return match.group("name").decode()
 
+class Worker(threading.Thread, DaemonBase):
+    # https://pymotw.com/2/threading/
+    # https://realpython.com/intro-to-python-threading/
+    def __init__(self,
+                 group=None,
+                 target=None,
+                 name=None,
+                 args=(),
+                 kwargs=None,
+                 verbose=None):
+        threading.Thread.__init__(self,
+                                  group=group,
+                                  target=target,
+                                  name=name) # , verbose=verbose
+        self.args   = args
+        self.kwargs = kwargs
+        self.q      = queue.Queue()
+        self.start()
+        return
+
+    def run(self):
+        logging.debug('running with %s and %s', self.args, self.kwargs)
+        logging.warning('running with %s and %s', self.args, self.kwargs)
+        while True:
+            item = self.q.get()
+            print(f'Working on {item}')
+            print(f'Finished {item}')
+            q.task_done()
+
 class Daemon(DaemonBase):
     sockbuffLen = 1024
 
@@ -106,6 +130,7 @@ class Daemon(DaemonBase):
         self.message_js = {}
         self.server_address = server_address
         self.mksocket()
+        self.worker = Worker()
 
     def mksocket(self):
         # Make sure the socket does not already exist
