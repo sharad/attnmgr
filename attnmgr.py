@@ -305,6 +305,51 @@ class Handler(DaemonBase):
         DaemonBase.__init__(self)
         print()
 
+class RemoteSshScreenPollHandler(Handler):
+    _defaultJson  = {'server': "nocli",
+                     'session': "tbnl",
+                     'timetaken': 0}
+    def __init__(self):
+        Handler.__init__(self)
+
+    def defaultJson(self, json):
+        default =  RemoteSshScreenPollHandler._defaultJson;
+        default.update( json )
+        return default
+
+    def checkFile(self, json):
+        # https://stackoverflow.com/questions/2192442/verify-a-file-exists-over-ssh
+        transport=paramiko.Transport("10.10.0.0")
+        transport.connect(username="service",password="word")
+        sftp=paramiko.SFTPClient.from_transport(transport)
+        filestat=sftp.stat("/opt/ad/bin/email_tidyup.sh")
+
+        # client = paramiko.SSHClient()
+        # client.load_system_host_keys()
+        # client.connect("10.10.0.0",username="service",password="word")
+        # _,stdout,_=client.exec_command("[ -f /opt/ad/bin/email_tidyup.sh ] && echo OK")
+        # assert stdout.read()
+
+    def copyFile(self, json):
+        # https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+        ssh = paramiko.SSHClient()
+        ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
+        ssh.connect(server, username=username, password=password)
+        sftp = ssh.open_sftp()
+        sftp.put(localpath, remotepath)
+        sftp.close()
+        ssh.close()
+
+
+        ssh = SSHClient()
+        ssh.load_system_host_keys()
+        ssh.connect('example.com')
+        with SCPClient(ssh.get_transport()) as scp:
+            scp.put('test.txt', 'test2.txt')
+            scp.get('test2.txt')
+
+    def run(self, json):
+
 class RemoteSshScreenHandler(Handler):
     _defaultJson  = {'server': "nocli",
                      'session': "tbnl",
