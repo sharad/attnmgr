@@ -276,6 +276,13 @@ class Handler(DaemonBase):
 class RemoteSshScreenHandler(Handler):
     def __init__(self):
         Handler.__init__(self)
+
+
+    def defaultJson(self):
+        return {'cmd': "nocli",
+                'winid': "0",
+                'timetaken': 0}
+
     def run(self):
         self.add(json)
 
