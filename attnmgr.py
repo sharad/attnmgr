@@ -101,6 +101,7 @@ class Worker(threading.Thread, DaemonBase):
                  args=(),
                  kwargs=None,
                  verbose=None):
+        DaemonBase.__init__(self)
         threading.Thread.__init__(self,
                                   group=group,
                                   target=target,
@@ -112,22 +113,37 @@ class Worker(threading.Thread, DaemonBase):
         self.start()
         return
 
+    def put(self, msg):
+        self.q.put(msg)
+
+    def get(self):
+        return self.q.get(msg)
+
+    def done(self):
+        return self.q.task_done()
+
     def run(self):
         logging.debug('running with %s and %s', self.args, self.kwargs)
         logging.warning('running with %s and %s', self.args, self.kwargs)
         while True:
-            item = self.q.get()
+            item     = self.get()
             print(f'Working on {item}')
-            self.handler.run(item)
+            js       = item['js']
+            daemon   = item['daemon']
+            sock     = item['sock']
+            peername = sock.getpeername()
+            response = self.handler.run(js)
+            self.log.warning('response "%s" to %s' % (response, peername))
+            daemon.message_queues[sock].put(response)
             print(f'Finished {item}')
-            self.q.task_done()
+            self.done()
 
 class Daemon(DaemonBase):
     sockbuffLen = 1024
 
     def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         DaemonBase.__init__(self)
-        self.handlers = {}
+        # self.handlers = {}
         self.message_queues = {}
         self.message_js = {}
         self.server_address = server_address
@@ -157,21 +173,19 @@ class Daemon(DaemonBase):
         self.outputs = [  ]
 
     def registerHandler(self, hdlrname, handler):
-        self.handlers[hdlrname] = handler
+        # self.handlers[hdlrname] = handler
         self.workers[hdlrname] = Worker(kwargs = {'handler': handler})
 
-    def processHandler(self, hdlrname, js):
-        if hdlrname in self.handlers:
-            # handler = self.handlers[hdlrname]
-            # handler.run(js)
-            self.workers[hdlrname].q.put(js)
+    def processHandler(self, hdlrname, js, sock):
+        if hdlrname in self.workers:
+            self.workers[hdlrname].put({'js': js, 'daemon': self, 'sock': sock})
         else:
             self.log.warning("No handler present for %s" % hdlrname)
 
-    def processJson(self, js):
+    def processJson(self, js, sock):
         if 1 == len(js):
             table = list(js.keys())[0]
-            self.processHandler(table, js[table])
+            self.processHandler(table, js[table], sock)
             return "ok"
 
     def is_json(self, myjson):
@@ -193,11 +207,8 @@ class Daemon(DaemonBase):
                 self.message_js[s] = data.decode()
 
             if self.is_json( self.message_js[s] ):
-                tableKv = json.loads( self.message_js[s] )
-                response = self.processJson(tableKv)
-                self.log.warning('response "%s" to %s' % (response, s.getpeername()))
-                self.message_queues[s].put( response )
-                # Add output channel for response
+                tableKv  = json.loads( self.message_js[s] )
+                response = self.processJson(tableKv, s) # send in thread
                 if s not in self.outputs:
                     self.outputs.append(s)
             else:
