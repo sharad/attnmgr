@@ -319,8 +319,9 @@ class RemoteSshScreenPollHandler(Handler):
 
     def checkFile(self, json):
         # https://stackoverflow.com/questions/2192442/verify-a-file-exists-over-ssh
-        transport=paramiko.Transport("10.10.0.0")
-        transport.connect(username="service",password="word")
+        connection = json["connection"]
+        transport=paramiko.Transport(connection)
+        transport.connect()
         sftp=paramiko.SFTPClient.from_transport(transport)
         filestat=sftp.stat("/opt/ad/bin/email_tidyup.sh")
 
@@ -332,9 +333,10 @@ class RemoteSshScreenPollHandler(Handler):
 
     def copyFile(self, json):
         # https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+        connection = json["connection"]
         ssh = paramiko.SSHClient()
         ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
-        ssh.connect(server, username=username, password=password)
+        ssh.connect( connection )
         sftp = ssh.open_sftp()
         sftp.put(localpath, remotepath)
         sftp.close()
@@ -349,6 +351,7 @@ class RemoteSshScreenPollHandler(Handler):
             scp.get('test2.txt')
 
     def run(self, json):
+        self.log.warning("run")
 
 class RemoteSshScreenHandler(Handler):
     _defaultJson  = {'server': "nocli",
