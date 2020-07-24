@@ -292,18 +292,18 @@ class XwinSessionHandler(Handler):
 
     def ask(self, json):
         # https://github.com/bcbnz/python-rofi
-        r = rofi.Rofi()
+        r        = rofi.Rofi()
         winid    = int( json["winid"], 10 )
         wtitle   = Utils.getWinTitle(winid)
         wtitleId = "%s[%d]" % (wtitle, winid)
         prompt   = "%s need your attention" % wtitleId
         actions  = dict()
 
-        message = "Finished %s" % json['cmd']
+        message  = "Finished %s" % json['cmd']
         actions[XwinSessionHandler.Action.Ignore] = "Ignore %s" % wtitleId
         actions[XwinSessionHandler.Action.Select] = "Select %s" % wtitleId
         actions[XwinSessionHandler.Action.Remind] = "Remind after 10 mins"
-        options = actions.values()
+        options  = actions.values()
         index, key = r.select(prompt, options, message )
         self.log.warning("index %d, key %d" % (index, key))
         return index
@@ -329,7 +329,7 @@ class XwinSessionHandler(Handler):
 
 def main():
     daemon = Daemon()
-    daemon.registerHandler("xwin", XwinSessionHandler())
+    daemon.registerHandler("xwin",       XwinSessionHandler())
     daemon.registerHandler("rsshscreen", RemoteSshScreenHandler())
     daemon.loop()
 
