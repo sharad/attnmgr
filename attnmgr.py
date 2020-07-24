@@ -142,8 +142,12 @@ class Worker(threading.Thread, DaemonBase):
             peername = sock.getpeername()
             response = self.handler.run(js)
             self.log.warning('response "%s" to %s' % (response, peername))
+
+            # we and client is not both only wait for 1 sec
             if sock in daemon.message_queues:
                 daemon.message_queues[sock].put(response)
+            else:
+                self.log.warning('not sending response "%s" to %s as sock closed' % (response, peername))
             print(f'Finished {item}')
             self.done()
 
@@ -359,11 +363,14 @@ class XwinSessionHandler(Handler):
         wtitle       = Utils.getWinTitle(winid)
         if winid == activewinid:
             self.log.warning("window %s[%d] already have focus" % (wtitle, winid))
+            return {'result': "has focus"}
         else:
             self.log.warning("window %s[%d] not have focus" % (wtitle, winid))
             if XwinSessionHandler.Action.Select.value == self.ask(json):
                 self.giveFocus(winid)
-        return True
+                return {'result': "focus request"}
+            else:
+                return {'result': "ignored"}
 
 def main():
     daemon = Daemon()
