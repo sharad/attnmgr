@@ -117,7 +117,7 @@ class Worker(threading.Thread, DaemonBase):
         self.q.put(msg)
 
     def get(self):
-        return self.q.get(msg)
+        return self.q.get()
 
     def done(self):
         return self.q.task_done()
