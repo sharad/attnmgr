@@ -107,6 +107,7 @@ class Worker(threading.Thread, DaemonBase):
                                   name=name) # , verbose=verbose
         self.args   = args
         self.kwargs = kwargs
+        self.handler = kwargs['handler']
         self.q      = queue.Queue()
         self.start()
         return
@@ -117,8 +118,9 @@ class Worker(threading.Thread, DaemonBase):
         while True:
             item = self.q.get()
             print(f'Working on {item}')
+            self.handler.run(item)
             print(f'Finished {item}')
-            q.task_done()
+            self.q.task_done()
 
 class Daemon(DaemonBase):
     sockbuffLen = 1024
@@ -130,7 +132,7 @@ class Daemon(DaemonBase):
         self.message_js = {}
         self.server_address = server_address
         self.mksocket()
-        self.worker = Worker()
+        self.workers = {}
 
     def mksocket(self):
         # Make sure the socket does not already exist
@@ -156,11 +158,13 @@ class Daemon(DaemonBase):
 
     def registerHandler(self, hdlrname, handler):
         self.handlers[hdlrname] = handler
+        self.workers[hdlrname] = Worker(kwargs = {'handler': handler})
 
     def processHandler(self, hdlrname, js):
         if hdlrname in self.handlers:
-            handler = self.handlers[hdlrname]
-            handler.run(js)
+            # handler = self.handlers[hdlrname]
+            # handler.run(js)
+            self.workers[hdlrname].q.put(js)
         else:
             self.log.warning("No handler present for %s" % hdlrname)
 
