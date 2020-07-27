@@ -20,6 +20,7 @@ import queue
 import threading
 from enum import Enum, unique, auto
 # https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+import paramiko
 from paramiko import SSHClient
 from scp import SCPClient
 
@@ -67,6 +68,13 @@ class Database(DaemonBase):
         self.db.search(Fruit.type == 'peach')
         self.db.update({'count': 10}, Fruit.type == 'apple')
 
+class Runnable(DaemonBase):
+    def __init__(self):
+        DaemonBase.__init__(self)
+
+    def run(self):
+        pass
+
 class Utils(DaemonBase):
     def __init__(self):
         DaemonBase.__init__(self)
@@ -92,6 +100,18 @@ class Utils(DaemonBase):
         match = re.match(b"WM_NAME\(\w+\) = (?P<name>.+)$", stdout)
         if match != None:
             return match.group("name").decode()
+
+    def _split_server(server):
+        if '@' in server:
+            username,server = server.split('@', 1)
+        else:
+            username = getuser()
+        if ':' in server:
+            server, port = server.split(':')
+            port = int(port)
+        else:
+            port = 22
+        return username, server, port
 
 class Worker(threading.Thread, DaemonBase):
     # https://pymotw.com/2/threading/
@@ -144,8 +164,8 @@ class Worker(threading.Thread, DaemonBase):
             self.log.warning('response "%s" to %s' % (response, peername))
 
             # we and client is not both only wait for 1 sec
-            if sock in daemon.message_queues:
-                daemon.message_queues[sock].put(response)
+            if sock in daemon.sock_output_queues:
+                daemon.sock_output_queues[sock].put(response)
             else:
                 self.log.warning('not sending response "%s" to %s as sock closed' % (response, peername))
             print(f'Finished {item}')
@@ -157,7 +177,7 @@ class Daemon(DaemonBase):
     def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         DaemonBase.__init__(self)
         # self.handlers = {}
-        self.message_queues = {}
+        self.sock_output_queues = {}
         self.message_js = {}
         self.server_address = server_address
         self.mksocket()
@@ -228,8 +248,8 @@ class Daemon(DaemonBase):
             self.inputs.remove(s)
         if s in self.cleanupsocks:
             self.cleanupsocks.remove(s)
-        if s in self.message_queues:
-            del self.message_queues[s]
+        if s in self.sock_output_queues:
+            del self.sock_output_queues[s]
         s.close()
 
     def processConnection(self, s, client_address):
@@ -249,7 +269,7 @@ class Daemon(DaemonBase):
                 if s not in self.outputs:
                     self.outputs.append(s)
             else:
-                self.message_queues[s].put("not processed")
+                self.sock_output_queues[s].put("not processed")
                 # Add output channel for response
                 if s not in self.outputs:
                     self.outputs.append(s)
@@ -273,13 +293,13 @@ class Daemon(DaemonBase):
                     connection.setblocking(0)
                     self.inputs.append(connection)
                     # Give the connection a queue for data we want to send
-                    self.message_queues[connection] = queue.Queue()
+                    self.sock_output_queues[connection] = queue.Queue()
                 else:
                     self.processConnection(s, client_address)
 
             for s in writable:
                 try:
-                    next_msg = self.message_queues[s].get_nowait()
+                    next_msg = self.sock_output_queues[s].get_nowait()
                 except queue.Empty:
                     # No messages waiting so stop checking for writability.
                     self.log.warning('output queue for %s is empty' % s.getpeername())
@@ -354,8 +374,9 @@ class RemoteSshScreenPollHandler(Handler):
         self.log.warning("run")
 
 class RemoteSshScreenHandler(Handler):
-    _defaultJson  = {'server': "nocli",
-                     'session': "tbnl",
+    Action = Enum('Action', ['Ignore', 'Select', 'Remind'], start=0)
+    _defaultJson  = {'server':    "nocli",
+                     'session':   "tbnl",
                      'timetaken': 0}
     def __init__(self):
         Handler.__init__(self)
@@ -365,8 +386,52 @@ class RemoteSshScreenHandler(Handler):
         default.update( json )
         return default
 
+    def ask(self, json):
+        # https://github.com/bcbnz/python-rofi
+        r          = rofi.Rofi()
+        connection = json["connection"]
+        sessionid  = json["sessionid"]
+        titleId    = "%s[%s]" % (connection, sessionid)
+        prompt     = "%s[%s] need your attention" % (connection, sessionid)
+        actions    = dict()
+
+        message  = "Finished %s" % json['cmd']
+        actions[RemoteSshScreenHandler.Action.Ignore] = "Ignore %s" % titleId
+        actions[RemoteSshScreenHandler.Action.Select] = "Select %s" % titleId
+        actions[RemoteSshScreenHandler.Action.Remind] = "Remind after 10 mins"
+        options  = actions.values()
+        index, key = r.select(prompt, options, message )
+        self.log.warning("index %d, key %d" % (index, key))
+        return index
+
+    def giveFocus(self, connection, sessionid):
+        ssh = paramiko.SSHClient()
+        ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
+        self.log.warning("connection %s, sessionid %s" % (connection, sessionid))
+        username, server, port = Utils._split_server(connection)
+        # ssh.connect( server, port, username=username )
+        self.log.warning("username %s, server %s, port %s" % (username, server, port))
+        # self.log.warning("username %s, server %s, port %s" % (username, server, port))
+        # ssh.exec_command("xterm -e screen -x -rd %s &" % sessionid)
+        # ssh.close()
+        os.system(" xterm -e ssh -t -X -o PubkeyAuthentication=yes -o VisualHostKey=no %s screen -d -m -x %s&" % (connection, sessionid))
+        # Utils.focusWindId(winid)
+
     def run(self, json):
-        self.add(json)
+        json =  self.defaultJson(json);
+        self.log.warning('running client with json = %s' % json)
+        connection = json["connection"]
+        sessionid  = json["sessionid"]
+        if False:
+            self.log.warning("session %s[%s] already have focus" % (connection, sessionid))
+            return {'result': "has focus"}
+        else:
+            self.log.warning("session %s[%s] not have focus" % (connection, sessionid))
+            if RemoteSshScreenHandler.Action.Select.value == self.ask(json):
+                self.giveFocus(connection, sessionid)
+                return {'result': "focus request"}
+            else:
+                return {'result': "ignored"}
 
 class XwinSessionHandler(Handler):
     Action = Enum('Action', ['Ignore', 'Select', 'Remind'], start=0)
