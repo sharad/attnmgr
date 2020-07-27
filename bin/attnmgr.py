@@ -319,11 +319,9 @@ class Daemon(DaemonBase):
                 self.tryToClose(s)
 
 
-
 class Handler(DaemonBase):
     def __init__(self):
         DaemonBase.__init__(self)
-        print()
 
 class RemoteSshScreenPollHandler(Handler):
     _defaultJson  = {'server': "nocli",
@@ -333,7 +331,7 @@ class RemoteSshScreenPollHandler(Handler):
         Handler.__init__(self)
 
     def defaultJson(self, json):
-        default =  RemoteSshScreenPollHandler._defaultJson;
+        default = RemoteSshScreenPollHandler._defaultJson;
         default.update( json )
         return default
 
@@ -405,17 +403,21 @@ class RemoteSshScreenHandler(Handler):
         return index
 
     def giveFocus(self, connection, sessionid):
-        ssh = paramiko.SSHClient()
-        ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
         self.log.warning("connection %s, sessionid %s" % (connection, sessionid))
-        username, server, port = Utils._split_server(connection)
-        # ssh.connect( server, port, username=username )
-        self.log.warning("username %s, server %s, port %s" % (username, server, port))
-        # self.log.warning("username %s, server %s, port %s" % (username, server, port))
-        # ssh.exec_command("xterm -e screen -x -rd %s &" % sessionid)
-        # ssh.close()
-        os.system(" xterm -e ssh -t -X -o PubkeyAuthentication=yes -o VisualHostKey=no %s screen -d -m -x %s&" % (connection, sessionid))
-        # Utils.focusWindId(winid)
+        if "localhost" == connection or "127.0.0.1" == connection:
+            os.system("xterm -e screen -d -m -x %s&" % (connection, sessionid))
+        else:
+            username, server, port = Utils._split_server(connection)
+            self.log.warning("username %s, server %s, port %s" % (username, server, port))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex((server, port))
+            if result == 0:
+                # check here if screen is already attached.
+                os.system("xterm -e ssh -t -X -o PubkeyAuthentication=yes -o VisualHostKey=no %s screen -d -m -x %s&" % (connection, sessionid))
+            else:
+                r = rofi.Rofi()
+                r.message("Not accessible.")
+            sock.close()
 
     def run(self, json):
         json =  self.defaultJson(json);
