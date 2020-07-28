@@ -7,5 +7,6 @@ setup(name             = 'attnmgr',
       # list folders, not files
       packages         = ['attnmgr'],
       scripts          = ['attnmgr/bin/attnmgr.py', 'attnmgr/bin/reqattn.py'],
-      package_data     = {'attnmgr': ['data/shell.zsh']},
+      # package_data     = {'attnmgr': ['data/shell.zsh']},
+      data_files       = [('share/attmgr', ['attnmgr/data/shell.zsh'])],
       install_requires = [])
