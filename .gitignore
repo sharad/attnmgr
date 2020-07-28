@@ -1,2 +1,5 @@
 *socket
 *.json
+*.egg-info
+build
+dist
