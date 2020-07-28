@@ -63,7 +63,7 @@ function notifyosd-precmd()
                   echo rsshscreen session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval" server "$SERVERIP" user "$USER" > ~/.attnmgr/$SESSION
               fi
           else
-              ./reqattn.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
+              reqattn.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
           fi
           if whence -p play >& /dev/null
           then
