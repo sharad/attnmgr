@@ -57,10 +57,13 @@ function notifyosd-precmd()
               local SESSION="${STY#*.}"
               if [ "x$SSH_CONNECTION" = "x" ]
               then
-                  reqattn rsshscreen session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
+                  local SERVER=$(echo $SSH_CONNECTION | cut -f3 -d' ')
+                  local PORT=$(echo $SSH_CONNECTION | cut -f4 -d' ')
+                  local CONNECTION="${USER}@${SERVER}:${PORT}"
+                  reqattn rsshscreen user "$USER" server "$SERVER" port "$PORT" connection "$CONNECTION" session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
               else
                   SERVERIP=$(echo $SSH_CONNECTION | cut -f3 -d' ')
-                  echo rsshscreen session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval" server "$SERVERIP" user "$USER" > ~/.attnmgr/$SESSION
+                  echo rsshscreen user "$USER" server "localhost" session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval" server "$SERVERIP" user "$USER" > ~/.attnmgr/$SESSION
               fi
           else
               reqattn xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
