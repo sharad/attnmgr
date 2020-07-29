@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 
 # https://pymotw.com/2/select/
 
@@ -486,6 +485,14 @@ class XwinSessionHandler(Handler):
                 return {'result': "focus request"}
             else:
                 return {'result': "ignored"}
+
+class SelfHandler(Handler):
+    def __init__(self):
+        Handler.__init__()
+
+    def restart(self):
+        # https://stackoverflow.com/a/36018657
+        os.execv(__file__, sys.argv)
 
 class app:
     def __init__(self):
