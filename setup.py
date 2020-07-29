@@ -5,7 +5,7 @@ from setuptools import setup
 setup(name             = 'attnmgr',
       version          = '1.0',
       # list folders, not files
-      packages         = ['attnmgr'],
+      # packages         = ['attnmgr'],
       scripts          = ['bin/attnmgr', 'bin/reqattn'],
       # package_data     = {'attnmgr': ['data/shell.zsh']},
       data_files       = [('share/attnmgr', ['share/attnmgr-hook.zsh'])],
