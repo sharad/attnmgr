@@ -6,7 +6,7 @@ setup(name             = 'attnmgr',
       version          = '1.0',
       # list folders, not files
       packages         = ['attnmgr'],
-      scripts          = ['attnmgr/bin/attnmgr', 'attnmgr/bin/reqattn'],
+      scripts          = ['bin/attnmgr', 'bin/reqattn'],
       # package_data     = {'attnmgr': ['data/shell.zsh']},
-      data_files       = [('share/attnmgr', ['attnmgr/data/attnmgr-hook.zsh'])],
+      data_files       = [('share/attnmgr', ['share/attnmgr-hook.zsh'])],
       install_requires = [])
