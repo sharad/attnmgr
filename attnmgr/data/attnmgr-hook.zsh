@@ -57,13 +57,13 @@ function notifyosd-precmd()
               local SESSION="${STY#*.}"
               if [ "x$SSH_CONNECTION" = "x" ]
               then
-                  reqattn.py rsshscreen session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
+                  reqattn rsshscreen session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
               else
                   SERVERIP=$(echo $SSH_CONNECTION | cut -f3 -d' ')
                   echo rsshscreen session "$SESSION" timetaken "$cmd_secs" cmd "$cmd" retval "$retval" server "$SERVERIP" user "$USER" > ~/.attnmgr/$SESSION
               fi
           else
-              reqattn.py xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
+              reqattn xwin winid "$(xdotool search --pid $PPID | head -1 )" timetaken "$cmd_secs" cmd "$cmd" retval "$retval"
           fi
           if whence -p play >& /dev/null
           then
