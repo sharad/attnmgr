@@ -107,7 +107,8 @@ class Utils(DaemonBase):
             username = getuser()
         if ':' in server:
             server, port = server.split(':')
-            port = int(port)
+            if port:
+                port = int(port)
         else:
             port = 22
         return username, server, port
@@ -387,9 +388,9 @@ class RemoteSshScreenHandler(Handler):
         # https://github.com/bcbnz/python-rofi
         r          = rofi.Rofi()
         connection = json["connection"]
-        sessionid  = json["sessionid"]
-        titleId    = "%s[%s]" % (connection, sessionid)
-        prompt     = "%s[%s] need your attention" % (connection, sessionid)
+        session    = json["session"]
+        titleId    = "%s[%s]" % (connection, session)
+        prompt     = "%s[%s] need your attention" % (connection, session)
         actions    = dict()
 
         message  = "Finished %s" % json['cmd']
@@ -401,18 +402,18 @@ class RemoteSshScreenHandler(Handler):
         self.log.warning("index %d, key %d" % (index, key))
         return index
 
-    def giveFocus(self, connection, sessionid):
-        self.log.warning("connection %s, sessionid %s" % (connection, sessionid))
-        if "localhost" == connection or "127.0.0.1" == connection:
-            os.system("xterm -e screen -d -m -x %s&" % (connection, sessionid))
+    def giveFocus(self, connection, session):
+        self.log.warning("connection %s, session %s" % (connection, session))
+        username, server, port = Utils._split_server(connection)
+        if server in ["", "localhost", "127.0.0.1"]:
+            os.system("xterm -e screen -d -m -x %s&" % session)
         else:
-            username, server, port = Utils._split_server(connection)
             self.log.warning("username %s, server %s, port %s" % (username, server, port))
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             result = sock.connect_ex((server, port))
             if result == 0:
                 # check here if screen is already attached.
-                os.system("xterm -e ssh -t -X -o PubkeyAuthentication=yes -o VisualHostKey=no %s screen -d -m -x %s&" % (connection, sessionid))
+                os.system("xterm -e ssh -t -X -o PubkeyAuthentication=yes -o VisualHostKey=no %s screen -d -m -x %s&" % (connection, session))
             else:
                 r = rofi.Rofi()
                 r.message("Not accessible.")
@@ -422,14 +423,14 @@ class RemoteSshScreenHandler(Handler):
         json =  self.defaultJson(json);
         self.log.warning('running client with json = %s' % json)
         connection = json["connection"]
-        sessionid  = json["sessionid"]
+        session    = json["session"]
         if False:
-            self.log.warning("session %s[%s] already have focus" % (connection, sessionid))
+            self.log.warning("session %s[%s] already have focus" % (connection, session))
             return {'result': "has focus"}
         else:
-            self.log.warning("session %s[%s] not have focus" % (connection, sessionid))
+            self.log.warning("session %s[%s] not have focus" % (connection, session))
             if RemoteSshScreenHandler.Action.Select.value == self.ask(json):
-                self.giveFocus(connection, sessionid)
+                self.giveFocus(connection, session)
                 return {'result': "focus request"}
             else:
                 return {'result': "ignored"}
