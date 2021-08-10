@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(name             = 'attnmgr',
-                 version          = '1.0',
+                 version          = '2.0',
                  # list folders, not files
                  # packages         = ['attnmgr'],
                  scripts          = ['bin/attnmgr', 'bin/reqattn'],
