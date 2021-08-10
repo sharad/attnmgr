@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # https://python-packaging-tutorial.readthedocs.io/en/latest/setup_py.html
-from setuptools
+import setuptools
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
