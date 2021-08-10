@@ -1,1 +1,2 @@
 include share/attnmgr-hook.zsh
+include src/attnmgr.py
