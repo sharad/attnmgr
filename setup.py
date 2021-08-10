@@ -10,5 +10,5 @@ setup(name             = 'attnmgr',
       # package_data     = {'attnmgr': ['data/shell.zsh']},
       data_files       = [('share/attnmgr', ['share/attnmgr-hook.zsh'])],
       package_dir={"": "src"},
-      packages=setuptools.find_packages(where="src")
+      packages=setuptools.find_packages(where="src"),
       install_requires = [])
