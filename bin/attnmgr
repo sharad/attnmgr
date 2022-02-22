@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import attnmgr
+from attnmgr import attnmgr
 
 def main():
     attnmgr.app().start()
