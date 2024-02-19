@@ -14,7 +14,7 @@ class Client:
 
     def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         logging.basicConfig(format='%(message)s')
-        self.log            = logging.getLogger(__name__)
+        self.log            = logging.getLogger(__name__).setLevel( level=os.getenv('ATTNMGR_LOGLEVEL', 'INFO').upper() )
         self.server_address = server_address
         self.connect()
 
@@ -24,7 +24,7 @@ class Client:
         self.sock.setblocking(False)
         self.socks = [ self.sock ]
         # Connect the socket to the port where the server is listening
-        self.log.warning('connecting to %s' % self.server_address)
+        self.log.info('connecting to %s' % self.server_address)
         for s in self.socks:
             try:
                 s.connect(self.server_address)
@@ -36,7 +36,7 @@ class Client:
         sock = self.sock
         try:
             timeout_in_seconds = 1
-            self.log.warning('%s: sending "%s"' % (sock.getsockname(), msg))
+            self.log.info('%s: sending "%s"' % (sock.getsockname(), msg))
             sock.send(msg.encode())
 
             # https://stackoverflow.com/a/2721734
@@ -44,9 +44,9 @@ class Client:
             for s in readable:
                 data = s.recv( Client.sockbuffLen )
                 if data:
-                    self.log.warning('%s: received "%s"' % (s.getsockname(), data.decode()))
+                    self.log.info('%s: received "%s"' % (s.getsockname(), data.decode()))
         finally:
-            self.log.warning('closing socket %s' % sock.getsockname())
+            self.log.info('closing socket %s' % sock.getsockname())
             sock.close()
 
 def listToDict(lst):
