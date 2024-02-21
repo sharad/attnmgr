@@ -15,7 +15,7 @@ class Client:
     def __init__(self, server_address = os.environ['HOME'] + '/.cache/var/attention-mgr/uds_socket'):
         logging.basicConfig(format='%(message)s')
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel( level=os.getenv('ATTNMGR_LOGLEVEL', 'INFO').upper() )
+        self.logger.setLevel( level=os.getenv('ATTNMGR_LOGLEVEL', 'WARNING').upper() )
         self.server_address = server_address
         self.connect()
 
