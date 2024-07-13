@@ -70,7 +70,10 @@ function notifyosd-precmd()
           fi
           if whence -p play >& /dev/null
           then
+            if [ -e $sndstat ]
+            then
 						  play -q $sndstat
+            fi
           fi
       fi
       unset cmd
